@@ -10,6 +10,7 @@ import os
 from src.data import ISROReader, JAXAReader, normalize_16bit_to_8bit
 from src.registration import FeatureMatcher, geometric_verification, refine_subpixel
 from src.metrics import calculate_rmse, calculate_psnr, calculate_ssim, check_uniformity
+from src.locator import locate_target_region
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 console = Console()
@@ -19,12 +20,10 @@ app = typer.Typer()
 def register(
     isro_img: str = typer.Option(..., help="Path to ISRO PDS4 .img file"),
     isro_xml: str = typer.Option(..., help="Path to ISRO PDS4 .xml file"),
+    index_h5: str = typer.Option(..., help="Path to the ISRO feature index (.h5) file"),
     jaxa_img: str = typer.Option(None, help="Path to JAXA PDS3 .img file"),
     jaxa_lbl: str = typer.Option(None, help="Path to JAXA PDS3 .lbl file"),
     query_img: str = typer.Option(None, help="Path to query square PNG image"),
-    cx: int = typer.Option(..., help="Center X of ISRO region to extract"),
-    cy: int = typer.Option(..., help="Center Y of ISRO region to extract"),
-    size: int = typer.Option(5000, help="Size of ISRO region to extract (px)"),
     max_dim: int = typer.Option(1024, help="Max image dimension to prevent GPU OOM"),
     method: str = typer.Option("disk", help="Feature extraction method (disk or sift)"),
     output: str = typer.Option("result.png", help="Output visualization path"),
@@ -67,6 +66,17 @@ def register(
             
         console.print(f"Source (JAXA) Shape: {source_raw.shape}")
     
+    console.print(f"\n[bold cyan]1.5. Automated Region Localization[/bold cyan]")
+    if not os.path.exists(index_h5):
+        console.print(f"[red]Index file not found: {index_h5}[/red]")
+        return
+        
+    try:
+        cx, cy, size = locate_target_region(source_raw, index_h5)
+    except Exception as e:
+        console.print(f"[red]Localization failed: {e}[/red]")
+        return
+        
     # 2. Read ISRO target region
     console.print(f"\n[bold cyan]2. Reading ISRO Target Region ({size}x{size}) at ({cx}, {cy})[/bold cyan]")
     try:
