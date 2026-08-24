@@ -15,7 +15,7 @@ class FeatureMatcher:
         if self.method == 'disk':
             logger.info(f"Loading DISK + LightGlue on {self.device}")
             self.extractor = KF.DISK.from_pretrained("depth").to(self.device).eval()
-            self.matcher = KF.LightGlue("disk").to(self.device).eval()
+            self.matcher = KF.LightGlueMatcher("disk").to(self.device).eval()
         elif self.method == 'sift':
             logger.info("Loading SIFT (CPU fallback)")
             self.sift = cv2.SIFT_create(nfeatures=10000)

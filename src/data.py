@@ -3,6 +3,7 @@ import logging
 import re
 import xml.etree.ElementTree as ET
 import cv2
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +48,18 @@ class ISROReader:
             logger.error(f"Failed to parse ISRO XML: {e}")
 
     def __enter__(self):
+        file_size = os.path.getsize(self.img_path)
+        data_size = file_size - self.offset
+        pixels = self.height * self.width
+        
+        if data_size == pixels:
+            dtype = np.uint8
+        else:
+            dtype = '<u2'
+            
         self.mm = np.memmap(
             self.img_path, 
-            dtype='<u2', # Little-endian unsigned 16-bit
+            dtype=dtype, 
             mode='r', 
             offset=self.offset, 
             shape=(self.height, self.width)

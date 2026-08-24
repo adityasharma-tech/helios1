@@ -74,7 +74,7 @@ def download_file(url, dest_path):
         print(f"Error downloading {url}: {e}")
 
 def main():
-    isro_dir = "/media/friday/Toshiba Drive/FILES/helios/ISRO"
+    isro_dir = "/media/friday/Toshiba Drive/FILES/helios/ISRO/pradan.issdc.gov.in/ch2/protected/downloadData/POST_OD/isda_archive/ch2_bundle/cho_bundle/nop/ohr_collection/"
     
     print("1. Parsing ISRO Bounds...")
     isro_files = list(Path(isro_dir).rglob('*.xml'))
