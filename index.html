@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lunar Coverage Map</title>
+    <style>
+        body {
+            background-color: #0f1115;
+            color: #ffffff;
+            font-family: 'Inter', system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            background-image: radial-gradient(circle at center, #1a1e26 0%, #0f1115 100%);
+        }
+        
+        .dashboard {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 95vw;
+            max-height: 95vh;
+        }
+
+        .image-container {
+            position: relative;
+            border-radius: 12px;
+            padding: 4px;
+            transition: all 0.4s ease;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        img {
+            display: block;
+            max-width: 100%;
+            max-height: 85vh;
+            border-radius: 10px;
+            object-fit: contain;
+            transition: filter 0.3s ease;
+        }
+        
+        /* The glowing download effect */
+        .glowing {
+            animation: pulse-border 1.5s infinite alternate;
+        }
+        
+        .glowing img {
+            filter: brightness(1.15) contrast(1.05);
+        }
+
+        @keyframes pulse-border {
+            0% {
+                box-shadow: 0 0 15px rgba(0, 195, 255, 0.1), inset 0 0 10px rgba(0, 195, 255, 0.1);
+            }
+            100% {
+                box-shadow: 0 0 35px rgba(0, 195, 255, 0.6), inset 0 0 15px rgba(0, 195, 255, 0.3);
+            }
+        }
+        
+        .status-badge {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(15, 17, 21, 0.8);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #10b981; /* Green */
+            box-shadow: 0 0 10px #10b981;
+        }
+
+        .syncing .indicator {
+            background-color: #00c3ff; /* Blue */
+            box-shadow: 0 0 15px #00c3ff;
+            animation: blink 0.6s infinite alternate;
+        }
+
+        @keyframes blink {
+            from { opacity: 0.3; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="status-badge" id="statusBox">
+            <span class="indicator"></span> 
+            <span id="statusText">LIVE TRACKING</span>
+        </div>
+        
+        <div class="image-container" id="imgContainer">
+            <!-- Ensure this points to the correct image file name -->
+            <img id="mapImage" src="map_coverage.png" alt="Lunar Coverage Map">
+        </div>
+    </div>
+
+    <script>
+        const mapImage = document.getElementById('mapImage');
+        const imgContainer = document.getElementById('imgContainer');
+        const statusBox = document.getElementById('statusBox');
+        const statusText = document.getElementById('statusText');
+        
+        // Polling interval: 3 seconds
+        setInterval(() => {
+            // 1. Start the glowing/syncing effect
+            imgContainer.classList.add('glowing');
+            statusBox.classList.add('syncing');
+            statusText.innerText = "SYNCING DATA...";
+            
+            // 2. Fetch the new image silently in memory
+            const newImg = new Image();
+            
+            // Use timestamp to prevent browser from caching the old image
+            const cacheBuster = new Date().getTime();
+            newImg.src = `map_coverage.png?t=${cacheBuster}`;
+            
+            // 3. When the image is fully downloaded
+            newImg.onload = () => {
+                // Update the visible image source
+                mapImage.src = newImg.src;
+                
+                // Add a tiny delay before removing the glow so it feels smooth
+                setTimeout(() => {
+                    imgContainer.classList.remove('glowing');
+                    statusBox.classList.remove('syncing');
+                    statusText.innerText = "LIVE TRACKING";
+                }, 400); 
+            };
+            
+            // 4. In case the python script is midway saving and causes a load error
+            newImg.onerror = () => {
+                imgContainer.classList.remove('glowing');
+                statusBox.classList.remove('syncing');
+                statusText.innerText = "WAITING FOR MAP";
+            };
+            
+        }, 3000); 
+    </script>
+</body>
+</html>

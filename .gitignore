@@ -218,4 +218,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-.venv
+.venvselene_metadata/
+selene_metadata/
