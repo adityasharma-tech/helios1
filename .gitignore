@@ -220,3 +220,4 @@ __marimo__/
 .streamlit/secrets.toml
 .venvselene_metadata/
 selene_metadata/
+selene_overlapping_data/
