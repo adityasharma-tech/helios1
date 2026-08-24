@@ -30,76 +30,71 @@ def register(
     output: str = typer.Option("result.png", help="Output visualization path"),
     plot_keypoints: bool = typer.Option(False, help="Plot all keypoints (red circles)")
 ):
-    """Run the SIH Lunar Image Registration pipeline on real data."""
+    """Run the SIH Lunar Image Registration pipeline on real data.
+    
+    Uses either a JAXA image or a custom PNG as query (source) and searches inside the ISRO OHRC data (target).
+    """
     if not os.path.exists(isro_img):
         console.print(f"[red]ISRO image not found: {isro_img}[/red]")
         return
         
+    has_jaxa_context = False
+    
     if query_img:
-        console.print(f"[bold cyan]1. Reading Query Image (Square)[/bold cyan]")
-        source_img = cv2.imread(query_img, cv2.IMREAD_GRAYSCALE)
-        console.print(f"Query Shape: {source_img.shape}")
-        
-        console.print(f"\n[bold cyan]2. Reading Target Region from ISRO Large Data ({size}x{size}) at ({cx}, {cy})[/bold cyan]")
-        with ISROReader(isro_img, isro_xml) as reader:
-            console.print(f"ISRO Full Shape: {reader.height}x{reader.width}")
-            target_raw = reader.extract_patch(cx, cy, size)
-            
-            # Extract full low-res image for context
-            step_y = max(1, reader.height // 1000)
-            step_x = max(1, reader.width // 1000)
-            step = min(step_y, step_x) # keep aspect ratio
-            full_lowres = np.array(reader.mm[::step, ::step])
-            
-            # Calculate box coordinates for the low-res image
-            box_x1 = int(max(0, cx - size//2) / step)
-            box_y1 = int(max(0, cy - size//2) / step)
-            box_x2 = int(min(reader.width, cx + size//2) / step)
-            box_y2 = int(min(reader.height, cy + size//2) / step)
-            
-        target_img = normalize_16bit_to_8bit(target_raw)
-        console.print(f"Target Shape: {target_img.shape}")
-        
+        console.print(f"[bold cyan]1. Reading Query Image (PNG)[/bold cyan]")
+        source_raw = cv2.imread(query_img, cv2.IMREAD_GRAYSCALE)
+        console.print(f"Source (PNG) Shape: {source_raw.shape}")
     else:
-        console.print(f"[bold cyan]1. Reading ISRO Source Image ({size}x{size}) at ({cx}, {cy})[/bold cyan]")
-        try:
-            with ISROReader(isro_img, isro_xml) as reader:
-                console.print(f"ISRO Full Shape: {reader.height}x{reader.width}")
-                source_raw = reader.extract_patch(cx, cy, size)
-                
-                # Extract full low-res image for context
-                step_y = max(1, reader.height // 1000)
-                step_x = max(1, reader.width // 1000)
-                step = min(step_y, step_x) # keep aspect ratio
-                full_lowres = np.array(reader.mm[::step, ::step])
-                
-                # Calculate box coordinates for the low-res image
-                box_x1 = int(max(0, cx - size//2) / step)
-                box_y1 = int(max(0, cy - size//2) / step)
-                box_x2 = int(min(reader.width, cx + size//2) / step)
-                box_y2 = int(min(reader.height, cy + size//2) / step)
-                
-        except Exception as e:
-            console.print(f"[red]Error reading ISRO data: {e}[/red]")
+        if not jaxa_img or not jaxa_lbl:
+            console.print("[red]Must provide either --query-img or both --jaxa-img and --jaxa-lbl[/red]")
             return
             
-        console.print(f"Source Patch Shape: {source_raw.shape}")
-        
-        console.print(f"\n[bold cyan]2. Reading JAXA Reference Image[/bold cyan]")
+        # 1. Read JAXA as query/source
+        console.print(f"[bold cyan]1. Reading JAXA Query Image[/bold cyan]")
         try:
             with JAXAReader(jaxa_img, jaxa_lbl) as reader:
-                console.print(f"JAXA Full Shape: {reader.height}x{reader.width}")
-                target_raw = reader.read_all()
+                jaxa_full_h, jaxa_full_w = reader.height, reader.width
+                console.print(f"JAXA Full Shape: {jaxa_full_h}x{jaxa_full_w}")
+                source_raw = reader.read_all()
+                
+                # Extract full low-res JAXA for context (4th panel)
+                jaxa_step = max(1, max(jaxa_full_h, jaxa_full_w) // 1000)
+                jaxa_full_lowres = np.array(reader.mm[::jaxa_step, ::jaxa_step])
+                has_jaxa_context = True
         except Exception as e:
             console.print(f"[red]Error reading JAXA data: {e}[/red]")
             return
             
-        console.print(f"Target Shape: {target_raw.shape}")
+        console.print(f"Source (JAXA) Shape: {source_raw.shape}")
+    
+    # 2. Read ISRO target region
+    console.print(f"\n[bold cyan]2. Reading ISRO Target Region ({size}x{size}) at ({cx}, {cy})[/bold cyan]")
+    try:
+        with ISROReader(isro_img, isro_xml) as reader:
+            isro_full_h, isro_full_w = reader.height, reader.width
+            console.print(f"ISRO Full Shape: {isro_full_h}x{isro_full_w}")
+            target_raw = reader.extract_patch(cx, cy, size)
+            
+            # Extract full low-res ISRO for context (1st panel)
+            isro_step = max(1, max(isro_full_h, isro_full_w) // 1000)
+            isro_full_lowres = np.array(reader.mm[::isro_step, ::isro_step])
+            
+            # Calculate ISRO box coordinates for the low-res context
+            isro_box_x1 = int(max(0, cx - size//2) / isro_step)
+            isro_box_y1 = int(max(0, cy - size//2) / isro_step)
+            isro_box_x2 = int(min(isro_full_w, cx + size//2) / isro_step)
+            isro_box_y2 = int(min(isro_full_h, cy + size//2) / isro_step)
+            
+    except Exception as e:
+        console.print(f"[red]Error reading ISRO data: {e}[/red]")
+        return
         
-        console.print(f"\n[bold cyan]3. Radiometric Normalization (CLAHE)[/bold cyan]")
-        source_img = normalize_16bit_to_8bit(source_raw)
-        target_img = normalize_16bit_to_8bit(target_raw)
-        console.print("Successfully scaled 16-bit flat binaries to 8-bit representations.")
+    console.print(f"Target (ISRO) Shape: {target_raw.shape}")
+    
+    console.print(f"\n[bold cyan]3. Radiometric Normalization (CLAHE)[/bold cyan]")
+    source_img = normalize_16bit_to_8bit(source_raw)
+    target_img = normalize_16bit_to_8bit(target_raw)
+    console.print("Successfully scaled data to 8-bit representations.")
     
     console.print(f"\n[bold cyan]3.5. Anti-OOM Resizing[/bold cyan]")
     # Resize images if they exceed max_dim to prevent CUDA OOM
@@ -163,46 +158,50 @@ def register(
         table.add_row("Match Uniformity", f"{uniformity:.1%} covered")
         console.print(table)
         
-        # Visualization
+        # ---- Visualization: Dynamic Panel Layout ----
         draw_flags = 0 if plot_keypoints else 2 # 2 = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
         
-        # We want: [Context] | [Target (What we found)] | [Source (Image we are searching)]
-        # cv2.drawMatches puts img1 on left, img2 on right. 
-        # By passing target_img as img1 and source_img as img2, target is middle, source is right.
-        swapped_matches = []
-        for i, m in enumerate(matches):
-            if inliers[i]:
-                # Swap queryIdx and trainIdx
-                swapped_matches.append(cv2.DMatch(_queryIdx=m.trainIdx, _trainIdx=m.queryIdx, _distance=m.distance))
-                
+        # drawMatches: img1=target (ISRO region), img2=source (query)
         match_vis = cv2.drawMatches(
             target_img, kp2, source_img, kp1,
-            swapped_matches,
+            [cv2.DMatch(_queryIdx=m.trainIdx, _trainIdx=m.queryIdx, _distance=m.distance) 
+             for i, m in enumerate(matches) if inliers[i]],
             None, matchColor=(0, 255, 0), singlePointColor=(0, 0, 255), flags=draw_flags
         )
         
-        # Prepare context visualization
-        full_8bit = normalize_16bit_to_8bit(full_lowres)
+        vis_h = match_vis.shape[0]
         
-        # Resize context image to match the height of match_vis
-        target_h = match_vis.shape[0]
-        scale = target_h / full_8bit.shape[0]
-        new_w = max(1, int(full_8bit.shape[1] * scale))
-        context_img_resized = cv2.resize(full_8bit, (new_w, target_h), interpolation=cv2.INTER_AREA)
-        context_bgr = cv2.cvtColor(context_img_resized, cv2.COLOR_GRAY2BGR)
+        # Panel 1: Full ISRO context with yellow box
+        isro_ctx_8bit = normalize_16bit_to_8bit(isro_full_lowres)
+        isro_scale = vis_h / isro_ctx_8bit.shape[0]
+        isro_ctx_w = max(1, int(isro_ctx_8bit.shape[1] * isro_scale))
+        isro_ctx = cv2.resize(isro_ctx_8bit, (isro_ctx_w, vis_h), interpolation=cv2.INTER_AREA)
+        isro_ctx_bgr = cv2.cvtColor(isro_ctx, cv2.COLOR_GRAY2BGR)
         
-        # Draw bounding box on resized context image
-        r_box_x1 = int(box_x1 * scale)
-        r_box_y1 = int(box_y1 * scale)
-        r_box_x2 = int(box_x2 * scale)
-        r_box_y2 = int(box_y2 * scale)
+        # Draw yellow box on ISRO context
+        ib_x1 = int(isro_box_x1 * isro_scale)
+        ib_y1 = int(isro_box_y1 * isro_scale)
+        ib_x2 = int(isro_box_x2 * isro_scale)
+        ib_y2 = int(isro_box_y2 * isro_scale)
+        ib_thick = max(2, int(3 * isro_scale))
+        cv2.rectangle(isro_ctx_bgr, (ib_x1, ib_y1), (ib_x2, ib_y2), (0, 255, 255), ib_thick)
         
-        # Ensure box is visible even if small
-        box_thickness = max(2, int(3 * scale))
-        cv2.rectangle(context_bgr, (r_box_x1, r_box_y1), (r_box_x2, r_box_y2), (0, 255, 255), box_thickness)
-        
-        # Combine context image with match visualization
-        final_vis = np.hstack((context_bgr, match_vis))
+        if has_jaxa_context:
+            # Panel 4: Full JAXA context with yellow box
+            jaxa_ctx_8bit = normalize_16bit_to_8bit(jaxa_full_lowres)
+            jaxa_scale = vis_h / jaxa_ctx_8bit.shape[0]
+            jaxa_ctx_w = max(1, int(jaxa_ctx_8bit.shape[1] * jaxa_scale))
+            jaxa_ctx = cv2.resize(jaxa_ctx_8bit, (jaxa_ctx_w, vis_h), interpolation=cv2.INTER_AREA)
+            jaxa_ctx_bgr = cv2.cvtColor(jaxa_ctx, cv2.COLOR_GRAY2BGR)
+            
+            jb_thick = max(2, int(3 * jaxa_scale))
+            cv2.rectangle(jaxa_ctx_bgr, (0, 0), (jaxa_ctx_w - 1, vis_h - 1), (0, 255, 255), jb_thick)
+            
+            # Combine: [ISRO Context] | [Match Vis] | [JAXA Context]
+            final_vis = np.hstack((isro_ctx_bgr, match_vis, jaxa_ctx_bgr))
+        else:
+            # Combine: [ISRO Context] | [Match Vis]
+            final_vis = np.hstack((isro_ctx_bgr, match_vis))
         
         cv2.imwrite(output, final_vis)
         console.print(f"\n[green]Visualization saved to {output} with shape {final_vis.shape}[/green]")
