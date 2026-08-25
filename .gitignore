@@ -221,3 +221,4 @@ __marimo__/
 .venvselene_metadata/
 selene_metadata/
 selene_overlapping_data/
+fast_reference_features.h5

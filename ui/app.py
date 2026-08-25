@@ -277,7 +277,7 @@ class MainWindow(QMainWindow):
         
         isro_img = "/media/friday/Toshiba Drive/FILES/helios/ISRO/pradan.issdc.gov.in/ch2/protected/downloadData/POST_OD/isda_archive/ch2_bundle/cho_bundle/nop/ohr_collection/data/calibrated/20260102/data/calibrated/20260102/ch2_ohr_ncp_20260102T1819015920_d_img_d18.img"
         isro_xml = "/media/friday/Toshiba Drive/FILES/helios/ISRO/pradan.issdc.gov.in/ch2/protected/downloadData/POST_OD/isda_archive/ch2_bundle/cho_bundle/nop/ohr_collection/data/calibrated/20260102/data/calibrated/20260102/ch2_ohr_ncp_20260102T1819015920_d_img_d18.xml"
-        index_h5 = "/home/friday/hhh/reference_features.h5"
+        index_h5 = "/home/friday/helios1/fast_reference_features.h5"
         output_png = "/home/friday/helios1/outputs/ui_result.png"
         
         os.makedirs(os.path.dirname(output_png), exist_ok=True)

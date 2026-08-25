@@ -1,0 +1,1 @@
+python scripts/build_index_fast.py "/media/friday/Toshiba Drive/FILES/helios/NAC_POLE_P870S2850.img" --output "fast_reference_features.h5" --workers 8
