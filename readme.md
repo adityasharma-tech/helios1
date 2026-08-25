@@ -646,7 +646,9 @@ HELIOS performs:
           ↓
 11. Achieve sub-pixel registration
           ↓
-12. Calculate accuracy metrics
+12. Calculate accuracy metrics (RMSE,Inlier Ratio, SSIM)
+
+
 ```
 
 The final result is a **registered lunar image with corresponding control points and quantitative registration metrics**.
